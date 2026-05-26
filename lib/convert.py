@@ -76,3 +76,15 @@ def _unquote(s: str) -> str:
     if len(s) >= 2 and s[0] == s[-1] and s[0] in {'"', "'"}:
         return s[1:-1]
     return s
+
+
+_KEEP_KEYS = {"name", "description", "model", "tools", "metadata"}
+
+
+def normalize_frontmatter(fm: dict[str, Any]) -> dict[str, Any]:
+    """Strip Claude-Code-only keys; keep the portable subset Antigravity reads.
+
+    Per spec §4.3 step 1. If Task 1.5 finds Antigravity rejects `metadata`
+    as a nested block, update _KEEP_KEYS and add a flattening pass here.
+    """
+    return {k: v for k, v in fm.items() if k in _KEEP_KEYS}

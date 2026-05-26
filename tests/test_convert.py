@@ -60,3 +60,35 @@ def test_parse_frontmatter_no_frontmatter_returns_empty_dict():
     fm, body = convert.parse_frontmatter(raw)
     assert fm == {}
     assert body == raw
+
+
+def test_normalize_frontmatter_keeps_required_keys():
+    fm = {"name": "x", "description": "d", "model": "sonnet", "tools": "Read, Bash"}
+    out = convert.normalize_frontmatter(fm)
+    assert out == fm
+
+
+def test_normalize_frontmatter_strips_claude_only_keys():
+    fm = {
+        "name": "x",
+        "description": "d",
+        "maxTurns": 20,
+        "user-invokable": True,
+        "argument-hint": "[url]",
+        "license": "MIT",
+    }
+    out = convert.normalize_frontmatter(fm)
+    assert "maxTurns" not in out
+    assert "user-invokable" not in out
+    assert "argument-hint" not in out
+    assert "license" not in out
+    assert out["name"] == "x"
+    assert out["description"] == "d"
+
+
+def test_normalize_frontmatter_preserves_metadata_block():
+    # If §9 unknown #5 proves Antigravity tolerates nested metadata, keep it.
+    # Otherwise: this test must be updated to assert flattening.
+    fm = {"name": "x", "description": "d", "metadata": {"author": "A", "version": "1.0"}}
+    out = convert.normalize_frontmatter(fm)
+    assert out["metadata"] == {"author": "A", "version": "1.0"}
