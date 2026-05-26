@@ -92,3 +92,25 @@ def test_normalize_frontmatter_preserves_metadata_block():
     fm = {"name": "x", "description": "d", "metadata": {"author": "A", "version": "1.0"}}
     out = convert.normalize_frontmatter(fm)
     assert out["metadata"] == {"author": "A", "version": "1.0"}
+
+
+def test_serialize_frontmatter_roundtrip_simple():
+    fm = {"name": "x", "description": "A skill"}
+    out = convert.serialize_frontmatter(fm)
+    assert out == "---\nname: x\ndescription: A skill\n---\n"
+
+
+def test_serialize_frontmatter_quotes_when_needed():
+    fm = {"name": "x", "description": "Contains: colon"}
+    out = convert.serialize_frontmatter(fm)
+    # Must round-trip through parser
+    parsed, _ = convert.parse_frontmatter(out + "\nbody")
+    assert parsed["description"] == "Contains: colon"
+
+
+def test_serialize_frontmatter_handles_nested_metadata():
+    fm = {"name": "x", "description": "d", "metadata": {"author": "A", "version": "1.0"}}
+    out = convert.serialize_frontmatter(fm)
+    parsed, _ = convert.parse_frontmatter(out + "\nbody")
+    assert parsed["metadata"]["author"] == "A"
+    assert parsed["metadata"]["version"] == "1.0"

@@ -88,3 +88,28 @@ def normalize_frontmatter(fm: dict[str, Any]) -> dict[str, Any]:
     as a nested block, update _KEEP_KEYS and add a flattening pass here.
     """
     return {k: v for k, v in fm.items() if k in _KEEP_KEYS}
+
+
+def serialize_frontmatter(fm: dict[str, Any]) -> str:
+    """Emit YAML frontmatter for a normalized dict. Returns string ending with `---\n`."""
+    lines = ["---"]
+    for key, val in fm.items():
+        if isinstance(val, dict):
+            lines.append(f"{key}:")
+            for ck, cv in val.items():
+                lines.append(f"  {ck}: {_yaml_value(cv)}")
+        else:
+            lines.append(f"{key}: {_yaml_value(val)}")
+    lines.append("---\n")
+    return "\n".join(lines)
+
+
+def _yaml_value(v: Any) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if any(c in s for c in (":", "#", "'", '"', "\n")):
+        return '"' + s.replace('"', '\\"') + '"'
+    return s
