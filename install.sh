@@ -107,7 +107,39 @@ PY
   ok "conversion complete"
 }
 
+rsync_install() {
+  log "installing skills + assets ..."
+  rsync -a --delete "${TMP_DIR}/staging/skills/" "${INSTALL_ROOT}/skills/"
+  ok "rsynced ${INSTALL_ROOT}/skills/"
+
+  # Copy shared assets (scripts/schema/pdf/data) into the orchestrator skill's dir
+  for sub in scripts schema pdf data; do
+    if [ -d "${TMP_DIR}/upstream/${sub}" ]; then
+      mkdir -p "${SEO_INSTALL}/${sub}"
+      rsync -a "${TMP_DIR}/upstream/${sub}/" "${SEO_INSTALL}/${sub}/"
+      ok "rsynced ${SEO_INSTALL}/${sub}/"
+    fi
+  done
+
+  # Merge extension scripts into shared scripts dir
+  if [ -d "${TMP_DIR}/upstream/extensions" ]; then
+    for ext_dir in "${TMP_DIR}/upstream/extensions/"*/; do
+      if [ -d "${ext_dir}scripts" ]; then
+        rsync -a "${ext_dir}scripts/" "${SEO_INSTALL}/scripts/"
+      fi
+    done
+    ok "merged extension scripts into ${SEO_INSTALL}/scripts/"
+  fi
+
+  # AGENTS.md context file
+  if [ -f "${TMP_DIR}/upstream/AGENTS.md" ]; then
+    cp "${TMP_DIR}/upstream/AGENTS.md" "${INSTALL_ROOT}/AGENTS.md"
+    ok "installed AGENTS.md"
+  fi
+}
+
 preflight
 clone_upstream
 run_conversion
-echo "(rsync + workflows + extensions follow)"
+rsync_install
+echo "(workflows + extensions follow)"
