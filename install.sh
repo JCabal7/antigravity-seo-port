@@ -14,10 +14,11 @@ set -euo pipefail
 PORT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 UPSTREAM_REPO="https://github.com/AgriciDaniel/claude-seo"
 UPSTREAM_TAG_DEFAULT="v2.0.0"
-INSTALL_ROOT="${HOME}/.gemini/antigravity"
-SEO_INSTALL="${INSTALL_ROOT}/skills/seo"
-MCP_CONFIG="${HOME}/.gemini/config/mcp_config.json"
+INSTALL_ROOT="${HOME}/.gemini/antigravity-seo-port"
+SEO_INSTALL="${INSTALL_ROOT}"           # extension root IS the install root
+MCP_CONFIG="${HOME}/.gemini/antigravity-cli/mcp_config.json"
 ENV_FILE="${SEO_INSTALL}/.env"
+HOOKS_FILE="${SEO_INSTALL}/hooks/hooks.json"
 
 # Defaults — overridden by flags
 NONINTERACTIVE=0
@@ -67,13 +68,13 @@ preflight() {
   command -v git  >/dev/null 2>&1 || die "git not found"
   command -v npx  >/dev/null 2>&1 || die "npx not found (install Node 20+)"
   command -v rsync >/dev/null 2>&1 || die "rsync not found"
-  command -v antigravity >/dev/null 2>&1 \
-    || die "antigravity CLI not found. Install from https://antigravity.google then re-run."
+  command -v antigravity >/dev/null 2>&1 || command -v agy >/dev/null 2>&1 \
+    || die "antigravity CLI not found (looked for 'antigravity' and 'agy'). Install from https://antigravity.google then re-run."
   ok "prereqs satisfied"
 
   [ -d "${HOME}/.gemini" ] || die "~/.gemini not initialized — run \`antigravity\` once to set it up, then re-run the installer"
 
-  mkdir -p "${INSTALL_ROOT}/skills" "${INSTALL_ROOT}/workflows"
+  mkdir -p "${INSTALL_ROOT}/skills" "${INSTALL_ROOT}/hooks"
   ok "install root ready: ${INSTALL_ROOT}"
 }
 
@@ -131,28 +132,23 @@ rsync_install() {
     ok "merged extension scripts into ${SEO_INSTALL}/scripts/"
   fi
 
-  # AGENTS.md context file
-  if [ -f "${TMP_DIR}/upstream/AGENTS.md" ]; then
-    cp "${TMP_DIR}/upstream/AGENTS.md" "${INSTALL_ROOT}/AGENTS.md"
-    ok "installed AGENTS.md"
-  fi
 }
 
-install_workflows() {
-  log "generating /seo dispatcher + per-subcommand workflows ..."
-  local WF_DIR="${INSTALL_ROOT}/workflows"
-  python3 - <<PY
-import sys
-sys.path.insert(0, "${PORT_ROOT}")
-from pathlib import Path
-from lib import workflow_install as w
+install_manifest() {
+  log "installing extension manifest + context file ..."
+  local VERSION
+  VERSION="$(grep '^version' "${PORT_ROOT}/pyproject.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
 
-skills_dir = Path("${INSTALL_ROOT}/skills")
-disc = w.discover_subcommands(skills_dir)
-w.install_workflows(Path("${WF_DIR}"), disc["subcmds"], disc["descriptions"])
-print(f"  installed {len(disc['subcmds'])} subcommand workflows + 1 dispatcher")
-PY
-  ok "workflows installed at ${WF_DIR}"
+  sed "s/{VERSION}/${VERSION}/" "${PORT_ROOT}/templates/gemini-extension.json.tmpl" \
+    > "${INSTALL_ROOT}/gemini-extension.json"
+  cp "${PORT_ROOT}/templates/GEMINI.md.tmpl" "${INSTALL_ROOT}/GEMINI.md"
+
+  # AGENTS.md from upstream is referenced by GEMINI.md via @./AGENTS.md
+  if [ -f "${TMP_DIR}/upstream/AGENTS.md" ]; then
+    cp "${TMP_DIR}/upstream/AGENTS.md" "${INSTALL_ROOT}/AGENTS.md"
+  fi
+
+  ok "manifest installed (version ${VERSION})"
 }
 
 should_install_extension() {
@@ -339,7 +335,6 @@ install_hooks() {
     chmod +x "${SEO_INSTALL}/hooks/validate-schema.py"
   fi
 
-  local HOOKS_FILE="${INSTALL_ROOT}/hooks.json"
   local FILE_PATH_VAR='$1'
 
   python3 - <<PY
@@ -446,16 +441,15 @@ PY
 }
 
 print_summary() {
-  local skill_count workflow_count
+  local skill_count
   skill_count="$(find "${INSTALL_ROOT}/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
-  workflow_count="$(find "${INSTALL_ROOT}/workflows" -maxdepth 1 -name 'seo*.md' | wc -l | tr -d ' ')"
   printf "\n════════════════════════════════════════\n"
   printf "║   Install complete                    ║\n"
   printf "════════════════════════════════════════\n\n"
   printf "Skills:    %s installed at %s/skills/\n" "${skill_count}" "${INSTALL_ROOT}"
-  printf "Workflows: %s installed at %s/workflows/\n" "${workflow_count}" "${INSTALL_ROOT}"
+  printf "Extension at: %s\n" "${INSTALL_ROOT}"
   printf "MCP servers: see %s\n" "${MCP_CONFIG}"
-  printf "Hooks: see %s/hooks.json\n" "${INSTALL_ROOT}"
+  printf "Hooks: see %s\n" "${HOOKS_FILE}"
   printf "Venv:  %s/.venv\n\n" "${SEO_INSTALL}"
   if [ "${#EXTENSION_FAILURES[@]:-0}" -gt 0 ]; then
     printf "Skipped extensions (rerun with --with-extensions to retry):\n"
@@ -466,7 +460,7 @@ print_summary() {
   fi
   printf "Verify:\n"
   printf "  antigravity\n"
-  printf "  /seo audit https://example.com\n\n"
+  printf "  Then in the prompt, ask: 'use the seo-audit skill on https://example.com'\n\n"
   printf "Uninstall:\n"
   printf "  bash %s/uninstall.sh\n\n" "${PORT_ROOT}"
 }
@@ -475,7 +469,7 @@ preflight
 clone_upstream
 run_conversion
 rsync_install
-install_workflows
+install_manifest
 install_mcp_extensions
 install_script_extensions
 install_hooks
