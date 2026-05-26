@@ -161,3 +161,24 @@ def convert_agent_to_skill(agent_md: str, *, new_name: str) -> str:
     fm["name"] = new_name
     fm = normalize_frontmatter(fm)
     return serialize_frontmatter(fm) + "\n" + body.lstrip("\n")
+
+
+def convert_skill(
+    raw: str,
+    *,
+    scripts_dir: str | None = None,
+    schema_dir: str | None = None,
+    pdf_dir: str | None = None,
+    data_dir: str | None = None,
+) -> str:
+    """End-to-end conversion: normalize frontmatter, rewrite body paths, re-serialize."""
+    fm, body = parse_frontmatter(raw)
+    fm = normalize_frontmatter(fm)
+    body = rewrite_paths(
+        body,
+        scripts_dir=scripts_dir,
+        schema_dir=schema_dir,
+        pdf_dir=pdf_dir,
+        data_dir=data_dir,
+    )
+    return serialize_frontmatter(fm) + "\n" + body.lstrip("\n")

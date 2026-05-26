@@ -168,3 +168,21 @@ def test_convert_agent_to_skill_normalizes_frontmatter():
     assert fm["description"].startswith("Specialist")
     assert "maxTurns" not in fm
     assert "You are a Technical SEO specialist" in body
+
+
+def test_convert_skill_normalizes_and_rewrites_paths():
+    raw = (
+        "---\nname: seo-audit\ndescription: Full audit.\n"
+        "maxTurns: 20\nuser-invokable: true\n---\n\n"
+        "Run: `python scripts/fetch_page.py <url>` then see `schema/templates.json`.\n"
+    )
+    out = convert.convert_skill(
+        raw,
+        scripts_dir="/install/scripts",
+        schema_dir="/install/schema",
+    )
+    fm, body = convert.parse_frontmatter(out)
+    assert fm == {"name": "seo-audit", "description": "Full audit."}
+    assert "/install/scripts/fetch_page.py" in body
+    assert "/install/schema/templates.json" in body
+    assert "maxTurns" not in out
