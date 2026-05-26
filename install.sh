@@ -138,8 +138,26 @@ rsync_install() {
   fi
 }
 
+install_workflows() {
+  log "generating /seo dispatcher + per-subcommand workflows ..."
+  local WF_DIR="${INSTALL_ROOT}/workflows"
+  python3 - <<PY
+import sys
+sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import workflow_install as w
+
+skills_dir = Path("${INSTALL_ROOT}/skills")
+disc = w.discover_subcommands(skills_dir)
+w.install_workflows(Path("${WF_DIR}"), disc["subcmds"], disc["descriptions"])
+print(f"  installed {len(disc['subcmds'])} subcommand workflows + 1 dispatcher")
+PY
+  ok "workflows installed at ${WF_DIR}"
+}
+
 preflight
 clone_upstream
 run_conversion
 rsync_install
-echo "(workflows + extensions follow)"
+install_workflows
+echo "(extensions + hooks + venv follow)"
