@@ -428,6 +428,49 @@ install_venv() {
   fi
 }
 
+verify_install() {
+  log "running portability check on installed tree ..."
+  python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import portability_check as pc
+findings = pc.check_tree(Path("${INSTALL_ROOT}/skills"))
+errors = [f for f in findings if f["severity"] == "error"]
+warnings_ = [f for f in findings if f["severity"] == "warning"]
+print(f"  errors: {len(errors)}, warnings: {len(warnings_)}")
+for e in errors:
+    print(f"  ✗ {e['path']}: {e['rule']}: {e['message']}")
+sys.exit(1 if errors else 0)
+PY
+  ok "portability check passed"
+}
+
+print_summary() {
+  local skill_count workflow_count
+  skill_count="$(find "${INSTALL_ROOT}/skills" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
+  workflow_count="$(find "${INSTALL_ROOT}/workflows" -maxdepth 1 -name 'seo*.md' | wc -l | tr -d ' ')"
+  printf "\n════════════════════════════════════════\n"
+  printf "║   Install complete                    ║\n"
+  printf "════════════════════════════════════════\n\n"
+  printf "Skills:    %s installed at %s/skills/\n" "${skill_count}" "${INSTALL_ROOT}"
+  printf "Workflows: %s installed at %s/workflows/\n" "${workflow_count}" "${INSTALL_ROOT}"
+  printf "MCP servers: see %s\n" "${MCP_CONFIG}"
+  printf "Hooks: see %s/hooks.json\n" "${INSTALL_ROOT}"
+  printf "Venv:  %s/.venv\n\n" "${SEO_INSTALL}"
+  if [ "${#EXTENSION_FAILURES[@]:-0}" -gt 0 ]; then
+    printf "Skipped extensions (rerun with --with-extensions to retry):\n"
+    for ext in "${EXTENSION_FAILURES[@]}"; do
+      printf "  - %s\n" "${ext}"
+    done
+    printf "\n"
+  fi
+  printf "Verify:\n"
+  printf "  antigravity\n"
+  printf "  /seo audit https://example.com\n\n"
+  printf "Uninstall:\n"
+  printf "  bash %s/uninstall.sh\n\n" "${PORT_ROOT}"
+}
+
 preflight
 clone_upstream
 run_conversion
@@ -437,4 +480,5 @@ install_mcp_extensions
 install_script_extensions
 install_hooks
 install_venv
-echo "(portability check follows)"
+verify_install
+print_summary
