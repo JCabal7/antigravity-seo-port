@@ -272,10 +272,70 @@ PY
   fi
 }
 
+install_script_extensions() {
+  log "script-only extensions ..."
+
+  if should_install_extension bing-webmaster; then
+    read -rsp "  Bing Webmaster Tools API key (empty to skip): " BING_KEY; echo
+    read -rp  "  IndexNow host key (empty to skip): " INDEXNOW_KEY
+    read -rp  "  IndexNow key location URL (https://example.com/<key>.txt, empty to skip): " INDEXNOW_LOC
+    python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import env_install
+creds = {}
+if "${BING_KEY}":  creds["BING_WEBMASTER_API_KEY"]   = "${BING_KEY}"
+if "${INDEXNOW_KEY}": creds["INDEXNOW_KEY"]          = "${INDEXNOW_KEY}"
+if "${INDEXNOW_LOC}": creds["INDEXNOW_KEY_LOCATION"] = "${INDEXNOW_LOC}"
+env_install.install_script_extension(Path("${ENV_FILE}"), "bing-webmaster", credentials=creds)
+PY
+    ok "bing-webmaster installed"
+  fi
+
+  if should_install_extension profound; then
+    read -rsp "  Profound API key: " PROFOUND_KEY; echo
+    python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import env_install
+env_install.install_script_extension(
+    Path("${ENV_FILE}"), "profound",
+    credentials={"PROFOUND_API_KEY": "${PROFOUND_KEY}"})
+PY
+    ok "profound installed"
+  fi
+
+  if should_install_extension seranking; then
+    read -rsp "  SE Ranking API key: " SERANKING_KEY; echo
+    python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import env_install
+env_install.install_script_extension(
+    Path("${ENV_FILE}"), "seranking",
+    credentials={"SERANKING_API_KEY": "${SERANKING_KEY}"})
+PY
+    ok "seranking installed"
+  fi
+
+  if should_install_extension unlighthouse; then
+    log "  pre-warming unlighthouse-cli ..."
+    npx --yes --package=unlighthouse-cli@^0.13 unlighthouse-ci --help >/dev/null 2>&1 || true
+    ok "unlighthouse pre-warmed"
+  fi
+
+  # Install dotenv shim alongside the .env so script-only extension Python wrappers can use it
+  if [ -f "${ENV_FILE}" ]; then
+    cp "${PORT_ROOT}/templates/dotenv_shim.py" "${SEO_INSTALL}/scripts/dotenv_shim.py"
+    ok "dotenv shim installed"
+  fi
+}
+
 preflight
 clone_upstream
 run_conversion
 rsync_install
 install_workflows
 install_mcp_extensions
-echo "(script-only extensions + hooks + venv follow)"
+install_script_extensions
+echo "(hooks + venv follow)"
