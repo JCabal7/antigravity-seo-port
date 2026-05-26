@@ -396,6 +396,38 @@ PY
   fi
 }
 
+install_venv() {
+  log "creating venv at ${SEO_INSTALL}/.venv ..."
+  if ! python3 -m venv "${SEO_INSTALL}/.venv" 2>/dev/null; then
+    warn "venv creation failed; falling back to --user install"
+    warn "  manual fix: pip install --user -r ${SEO_INSTALL}/requirements.txt"
+    VENV_OK=0
+  else
+    VENV_OK=1
+    ok "venv created"
+  fi
+
+  if [ -f "${TMP_DIR}/upstream/requirements.txt" ]; then
+    cp "${TMP_DIR}/upstream/requirements.txt" "${SEO_INSTALL}/requirements.txt"
+    log "installing Python deps ..."
+    if [ "${VENV_OK}" -eq 1 ]; then
+      "${SEO_INSTALL}/.venv/bin/pip" install --quiet -r "${SEO_INSTALL}/requirements.txt" \
+        || warn "pip install failed; rerun: ${SEO_INSTALL}/.venv/bin/pip install -r ${SEO_INSTALL}/requirements.txt"
+    else
+      pip install --quiet --user -r "${SEO_INSTALL}/requirements.txt" \
+        || warn "pip --user install failed; install Python deps manually"
+    fi
+    ok "Python deps installed"
+  fi
+
+  log "installing Playwright browsers (optional) ..."
+  if [ -f "${SEO_INSTALL}/.venv/bin/playwright" ]; then
+    "${SEO_INSTALL}/.venv/bin/python" -m playwright install chromium >/dev/null 2>&1 \
+      && ok "Playwright Chromium installed" \
+      || warn "Playwright install failed (visual analysis will fall back to WebFetch)"
+  fi
+}
+
 preflight
 clone_upstream
 run_conversion
@@ -404,4 +436,5 @@ install_workflows
 install_mcp_extensions
 install_script_extensions
 install_hooks
-echo "(venv follows)"
+install_venv
+echo "(portability check follows)"
