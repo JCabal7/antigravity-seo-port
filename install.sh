@@ -155,9 +155,127 @@ PY
   ok "workflows installed at ${WF_DIR}"
 }
 
+should_install_extension() {
+  local ext="$1"
+  if [ -n "${WITH_EXTENSIONS}" ]; then
+    case ",${WITH_EXTENSIONS}," in *",${ext},"*) return 0 ;; esac
+    return 1
+  fi
+  if [ "${NONINTERACTIVE}" -eq 1 ]; then
+    return 1
+  fi
+  read -rp "Install ${ext}? [y/N] " ans
+  [ "${ans}" = "y" ] || [ "${ans}" = "Y" ]
+}
+
+EXTENSION_FAILURES=()
+
+install_mcp_extensions() {
+  log "MCP-server extensions ..."
+
+  if should_install_extension firecrawl; then
+    read -rsp "  Firecrawl API key: " FIRECRAWL_API_KEY; echo
+    if [ -z "${FIRECRAWL_API_KEY}" ]; then
+      warn "firecrawl: empty API key — skipping"
+      EXTENSION_FAILURES+=("firecrawl (empty key)")
+    else
+      if python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import mcp_install
+mcp_install.install_mcp_server(
+    Path("${MCP_CONFIG}"), "firecrawl",
+    credentials={"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"})
+PY
+      then
+        ok "firecrawl installed"
+      else
+        warn "firecrawl install failed — skipping"
+        EXTENSION_FAILURES+=("firecrawl")
+      fi
+    fi
+  fi
+
+  if should_install_extension dataforseo; then
+    read -rp "  DataForSEO username: " DATAFORSEO_USERNAME
+    read -rsp "  DataForSEO password: " DATAFORSEO_PASSWORD; echo
+    if [ -z "${DATAFORSEO_USERNAME}" ] || [ -z "${DATAFORSEO_PASSWORD}" ]; then
+      warn "dataforseo: empty credentials — skipping"
+      EXTENSION_FAILURES+=("dataforseo (empty credentials)")
+    else
+      mkdir -p "${SEO_INSTALL}/extensions/dataforseo"
+      cp "${TMP_DIR}/upstream/extensions/dataforseo/field-config.json" \
+         "${SEO_INSTALL}/extensions/dataforseo/field-config.json" 2>/dev/null || true
+      if python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import mcp_install
+mcp_install.install_mcp_server(
+    Path("${MCP_CONFIG}"), "dataforseo",
+    credentials={"DATAFORSEO_USERNAME": "${DATAFORSEO_USERNAME}",
+                 "DATAFORSEO_PASSWORD": "${DATAFORSEO_PASSWORD}"},
+    extra_env={"FIELD_CONFIG_PATH": "${SEO_INSTALL}/extensions/dataforseo/field-config.json"})
+PY
+      then
+        ok "dataforseo installed"
+      else
+        warn "dataforseo install failed — skipping"
+        EXTENSION_FAILURES+=("dataforseo")
+      fi
+    fi
+  fi
+
+  if should_install_extension banana; then
+    read -rsp "  Google AI (Gemini) API key: " GOOGLE_AI_API_KEY; echo
+    if [ -z "${GOOGLE_AI_API_KEY}" ]; then
+      warn "banana: empty API key — skipping"
+      EXTENSION_FAILURES+=("banana (empty key)")
+    else
+      if python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import mcp_install
+mcp_install.install_mcp_server(
+    Path("${MCP_CONFIG}"), "banana",
+    credentials={"GOOGLE_AI_API_KEY": "${GOOGLE_AI_API_KEY}"})
+PY
+      then
+        ok "banana installed"
+      else
+        warn "banana install failed — skipping"
+        EXTENSION_FAILURES+=("banana")
+      fi
+    fi
+  fi
+
+  if should_install_extension ahrefs; then
+    read -rsp "  Ahrefs API token: " AHREFS_API_TOKEN; echo
+    if [ -z "${AHREFS_API_TOKEN}" ]; then
+      warn "ahrefs: empty API token — skipping"
+      EXTENSION_FAILURES+=("ahrefs (empty token)")
+    else
+      if python3 - <<PY
+import sys; sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import mcp_install
+mcp_install.install_mcp_server(
+    Path("${MCP_CONFIG}"), "ahrefs",
+    credentials={"AHREFS_API_TOKEN": "${AHREFS_API_TOKEN}"})
+PY
+      then
+        ok "ahrefs installed"
+      else
+        warn "ahrefs install failed — skipping"
+        EXTENSION_FAILURES+=("ahrefs")
+      fi
+    fi
+  fi
+}
+
 preflight
 clone_upstream
 run_conversion
 rsync_install
 install_workflows
-echo "(extensions + hooks + venv follow)"
+install_mcp_extensions
+echo "(script-only extensions + hooks + venv follow)"
