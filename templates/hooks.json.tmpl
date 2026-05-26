@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{INSTALL_PATH}/.venv/bin/python {INSTALL_PATH}/hooks/validate-schema.py \"{FILE_PATH_VAR}\""
+          }
+        ]
+      }
+    ]
+  }
+}
