@@ -77,5 +77,37 @@ preflight() {
   ok "install root ready: ${INSTALL_ROOT}"
 }
 
+clone_upstream() {
+  TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/antigravity-seo-port.XXXX")"
+  trap 'rm -rf "${TMP_DIR}"' EXIT
+  log "cloning ${UPSTREAM_REPO} @ ${UPSTREAM_TAG} ..."
+  git clone --depth 1 --branch "${UPSTREAM_TAG}" "${UPSTREAM_REPO}" "${TMP_DIR}/upstream" >/dev/null 2>&1 \
+    || die "clone failed (tag ${UPSTREAM_TAG} not found?)"
+  ok "upstream cloned"
+}
+
+run_conversion() {
+  log "converting upstream tree to Antigravity shape ..."
+  python3 - <<PY
+import sys
+sys.path.insert(0, "${PORT_ROOT}")
+from pathlib import Path
+from lib import convert
+
+summary = convert.convert_tree(
+    src=Path("${TMP_DIR}/upstream"),
+    dst=Path("${TMP_DIR}/staging"),
+    scripts_dir="${SEO_INSTALL}/scripts",
+    schema_dir="${SEO_INSTALL}/schema",
+    pdf_dir="${SEO_INSTALL}/pdf",
+    data_dir="${SEO_INSTALL}/data",
+)
+print(f"  converted: {len(summary['skills'])} skills, {len(summary['agents_mapped'])} agents→skills")
+PY
+  ok "conversion complete"
+}
+
 preflight
-echo "(install steps follow in subsequent tasks)"
+clone_upstream
+run_conversion
+echo "(rsync + workflows + extensions follow)"
