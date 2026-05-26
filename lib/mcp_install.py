@@ -33,3 +33,40 @@ def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise
+
+
+MCP_SERVERS: dict[str, dict[str, Any]] = {
+    "firecrawl": {
+        "server_name": "firecrawl-mcp",
+        "command": "npx",
+        "args": ["-y", "firecrawl-mcp@3.11.0"],
+        "env_vars": ["FIRECRAWL_API_KEY"],
+        "env_defaults": {},
+    },
+    "dataforseo": {
+        "server_name": "dataforseo",
+        "command": "npx",
+        "args": ["-y", "dataforseo-mcp-server@2.8.10"],
+        "env_vars": ["DATAFORSEO_USERNAME", "DATAFORSEO_PASSWORD"],
+        "env_defaults": {
+            "ENABLED_MODULES": (
+                "SERP,KEYWORDS_DATA,ONPAGE,DATAFORSEO_LABS,BACKLINKS,"
+                "DOMAIN_ANALYTICS,BUSINESS_DATA,CONTENT_ANALYSIS,AI_OPTIMIZATION"
+            ),
+        },
+    },
+    "banana": {
+        "server_name": "nanobanana-mcp",
+        "command": "npx",
+        "args": ["-y", "@ycse/nanobanana-mcp@1.1.1"],
+        "env_vars": ["GOOGLE_AI_API_KEY"],
+        "env_defaults": {},
+    },
+    "ahrefs": {
+        "server_name": "ahrefs",
+        "command": "npx",
+        "args": ["--yes", "--package=@ahrefs/mcp", "ahrefs-mcp"],
+        "env_vars": ["AHREFS_API_TOKEN"],
+        "env_defaults": {},
+    },
+}
