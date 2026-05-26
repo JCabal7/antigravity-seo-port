@@ -182,3 +182,74 @@ def convert_skill(
         data_dir=data_dir,
     )
     return serialize_frontmatter(fm) + "\n" + body.lstrip("\n")
+
+
+def convert_tree(
+    *,
+    src: Path,
+    dst: Path,
+    scripts_dir: str | None = None,
+    schema_dir: str | None = None,
+    pdf_dir: str | None = None,
+    data_dir: str | None = None,
+) -> dict[str, list[str]]:
+    """Walk `src` (upstream claude-seo clone) and write Antigravity-shaped tree to `dst`.
+
+    Returns a summary dict: {"skills": [names], "agents_mapped": [names]}.
+    """
+    dst.mkdir(parents=True, exist_ok=True)
+    (dst / "skills").mkdir(exist_ok=True)
+
+    skill_names: set[str] = set()
+    summary: dict[str, list[str]] = {"skills": [], "agents_mapped": []}
+
+    # 1. Convert each skill.
+    src_skills = src / "skills"
+    if src_skills.is_dir():
+        for skill_dir in sorted(src_skills.iterdir()):
+            if not skill_dir.is_dir():
+                continue
+            name = skill_dir.name
+            skill_names.add(name)
+            out_skill_dir = dst / "skills" / name
+            out_skill_dir.mkdir(parents=True, exist_ok=True)
+            for entry in skill_dir.iterdir():
+                if entry.name == "SKILL.md":
+                    converted = convert_skill(
+                        entry.read_text(),
+                        scripts_dir=scripts_dir,
+                        schema_dir=schema_dir,
+                        pdf_dir=pdf_dir,
+                        data_dir=data_dir,
+                    )
+                    (out_skill_dir / "SKILL.md").write_text(converted)
+                elif entry.is_dir():
+                    _copy_tree(entry, out_skill_dir / entry.name)
+                else:
+                    (out_skill_dir / entry.name).write_bytes(entry.read_bytes())
+            summary["skills"].append(name)
+
+    # 2. Convert each agent into a skill (with collision suffixing).
+    src_agents = src / "agents"
+    if src_agents.is_dir():
+        for agent_file in sorted(src_agents.glob("*.md")):
+            agent_name = agent_file.stem
+            target_name = agent_target_skill_name(agent_name, skill_names)
+            out_skill_dir = dst / "skills" / target_name
+            out_skill_dir.mkdir(parents=True, exist_ok=True)
+            converted = convert_agent_to_skill(agent_file.read_text(), new_name=target_name)
+            (out_skill_dir / "SKILL.md").write_text(converted)
+            summary["agents_mapped"].append(target_name)
+            skill_names.add(target_name)
+
+    return summary
+
+
+def _copy_tree(src: Path, dst: Path) -> None:
+    """Recursive copy that preserves file contents byte-for-byte. No symlink magic."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for entry in src.iterdir():
+        if entry.is_dir():
+            _copy_tree(entry, dst / entry.name)
+        else:
+            (dst / entry.name).write_bytes(entry.read_bytes())

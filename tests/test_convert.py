@@ -186,3 +186,33 @@ def test_convert_skill_normalizes_and_rewrites_paths():
     assert "/install/scripts/fetch_page.py" in body
     assert "/install/schema/templates.json" in body
     assert "maxTurns" not in out
+
+
+def test_convert_tree_copies_and_normalizes_skills(tmp_upstream, tmp_path):
+    out_dir = tmp_path / "staging"
+    convert.convert_tree(
+        src=tmp_upstream,
+        dst=out_dir,
+        scripts_dir="/install/scripts",
+        schema_dir="/install/schema",
+        pdf_dir="/install/pdf",
+        data_dir="/install/data",
+    )
+    audit = (out_dir / "skills" / "seo-audit" / "SKILL.md").read_text()
+    assert "name: seo-audit" in audit
+    assert "maxTurns" not in audit
+    assert "/install/scripts/fetch_page.py" in audit
+
+
+def test_convert_tree_maps_agents_to_skills(tmp_upstream, tmp_path):
+    out_dir = tmp_path / "staging"
+    convert.convert_tree(
+        src=tmp_upstream,
+        dst=out_dir,
+        scripts_dir="/install/scripts",
+    )
+    # Existing skill `seo-audit` does NOT collide with `seo-technical` agent,
+    # so the agent becomes a skill with the same name.
+    technical = (out_dir / "skills" / "seo-technical" / "SKILL.md").read_text()
+    assert "name: seo-technical" in technical
+    assert "You are a Technical SEO specialist" in technical
