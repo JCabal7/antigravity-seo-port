@@ -331,6 +331,71 @@ PY
   fi
 }
 
+install_hooks() {
+  log "installing schema-validation hook ..."
+  mkdir -p "${SEO_INSTALL}/hooks"
+  if [ -f "${TMP_DIR}/upstream/hooks/validate-schema.py" ]; then
+    cp "${TMP_DIR}/upstream/hooks/validate-schema.py" "${SEO_INSTALL}/hooks/validate-schema.py"
+    chmod +x "${SEO_INSTALL}/hooks/validate-schema.py"
+  fi
+
+  local HOOKS_FILE="${INSTALL_ROOT}/hooks.json"
+  local FILE_PATH_VAR='$1'
+
+  python3 - <<PY
+import json, os, sys, tempfile
+hooks_path = "${HOOKS_FILE}"
+install_path = "${SEO_INSTALL}"
+file_path_var = '${FILE_PATH_VAR}'
+
+template = open("${PORT_ROOT}/templates/hooks.json.tmpl").read()
+new_hooks = json.loads(
+    template
+    .replace("{INSTALL_PATH}", install_path)
+    .replace("{FILE_PATH_VAR}", file_path_var)
+)
+
+existing = {}
+if os.path.exists(hooks_path):
+    try:
+        existing = json.load(open(hooks_path))
+    except json.JSONDecodeError:
+        pass
+
+merged = existing
+merged.setdefault("hooks", {}).setdefault("PostToolUse", [])
+
+# Idempotent: replace any prior entry from this installer.
+owner_tag = "antigravity-seo-validate-schema"
+merged["hooks"]["PostToolUse"] = [
+    h for h in merged["hooks"]["PostToolUse"]
+    if h.get("_owner") != owner_tag
+]
+new_entry = new_hooks["hooks"]["PostToolUse"][0]
+new_entry["_owner"] = owner_tag
+merged["hooks"]["PostToolUse"].append(new_entry)
+
+os.makedirs(os.path.dirname(hooks_path), exist_ok=True)
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(hooks_path), prefix=".hooks.", suffix=".json")
+with os.fdopen(fd, "w") as fh:
+    json.dump(merged, fh, indent=2)
+os.replace(tmp, hooks_path)
+print(f"  hooks merged into {hooks_path}")
+PY
+  ok "hook installed"
+
+  # Smoke-test the validator script standalone (only if venv exists)
+  if [ -x "${SEO_INSTALL}/.venv/bin/python" ] && [ -f "${SEO_INSTALL}/hooks/validate-schema.py" ]; then
+    echo '<script type="application/ld+json">{"@context":"https://schema.org"}</script>' > /tmp/.schema-probe.html
+    if "${SEO_INSTALL}/.venv/bin/python" "${SEO_INSTALL}/hooks/validate-schema.py" /tmp/.schema-probe.html >/dev/null 2>&1; then
+      ok "validator script smoke-tested"
+    else
+      warn "validator script smoke test failed (will retry post-venv)"
+    fi
+    rm -f /tmp/.schema-probe.html
+  fi
+}
+
 preflight
 clone_upstream
 run_conversion
@@ -338,4 +403,5 @@ rsync_install
 install_workflows
 install_mcp_extensions
 install_script_extensions
-echo "(hooks + venv follow)"
+install_hooks
+echo "(venv follows)"
