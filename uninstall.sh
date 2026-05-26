@@ -50,6 +50,22 @@ print(manifest)
 PY
 }
 
+remove_skill_symlinks() {
+  log "removing skill symlinks from ~/.gemini/skills/ ..."
+  local shared="${HOME}/.gemini/skills"
+  [ -d "${shared}" ] || { ok "no shared skills dir"; return; }
+  local count=0
+  for link in "${shared}"/*; do
+    [ -L "${link}" ] || continue
+    local target
+    target="$(readlink "${link}" 2>/dev/null || true)"
+    case "${target}" in
+      "${INSTALL_ROOT}/skills/"*|"${INSTALL_ROOT}/skills/"*/) rm "${link}"; count=$((count + 1)) ;;
+    esac
+  done
+  ok "removed ${count} symlink(s)"
+}
+
 remove_extension() {
   if [ -d "${INSTALL_ROOT}" ]; then
     log "removing extension dir ${INSTALL_ROOT} ..."
@@ -94,6 +110,7 @@ remove_env_warning
 manifest_path="$(snapshot)"
 ok "snapshot saved: ${manifest_path}"
 
+remove_skill_symlinks
 remove_extension
 remove_mcp
 

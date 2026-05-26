@@ -134,6 +134,21 @@ rsync_install() {
 
 }
 
+install_skill_symlinks() {
+  log "exposing skills via ~/.gemini/skills/ (Antigravity Shared path) ..."
+  local shared="${HOME}/.gemini/skills"
+  mkdir -p "${shared}"
+  local count=0
+  for d in "${INSTALL_ROOT}/skills/"*/; do
+    [ -d "${d}" ] || continue
+    local name
+    name="$(basename "${d}")"
+    ln -sfn "${d%/}" "${shared}/${name}"
+    count=$((count + 1))
+  done
+  ok "linked ${count} skills into ${shared}/"
+}
+
 install_manifest() {
   log "installing extension manifest + context file ..."
   local VERSION
@@ -448,6 +463,7 @@ print_summary() {
   printf "════════════════════════════════════════\n\n"
   printf "Skills:    %s installed at %s/skills/\n" "${skill_count}" "${INSTALL_ROOT}"
   printf "Extension at: %s\n" "${INSTALL_ROOT}"
+  printf "Skills exposed at: %s/skills/ (symlinks to extension dir)\n" "${HOME}/.gemini"
   printf "MCP servers: see %s\n" "${MCP_CONFIG}"
   printf "Hooks: see %s\n" "${HOOKS_FILE}"
   printf "Venv:  %s/.venv\n\n" "${SEO_INSTALL}"
@@ -469,6 +485,7 @@ preflight
 clone_upstream
 run_conversion
 rsync_install
+install_skill_symlinks
 install_manifest
 install_mcp_extensions
 install_script_extensions

@@ -61,8 +61,11 @@ ls ~/.gemini/antigravity-seo-port/skills/
 
 ## What gets installed where
 
-- Extension files: `~/.gemini/antigravity-seo-port/` (manifest, GEMINI.md, skills, hooks, scripts, venv, .env)
-- MCP server entries: merged into `~/.gemini/antigravity-cli/mcp_config.json` (CLI install — does not touch IDE)
+- **Skills (Antigravity-discoverable):** symlinks at `~/.gemini/skills/seo-*` (the "Shared" skill path Antigravity reads)
+- **Extension assets:** `~/.gemini/antigravity-seo-port/` — manifest (`gemini-extension.json`), context (`GEMINI.md`), canonical skill files, scripts, schema, hooks, venv, `.env`
+- **MCP server entries:** merged into `~/.gemini/antigravity-cli/mcp_config.json` (CLI install — does not touch IDE)
+
+The symlinks point into the extension dir, so uninstalling removes both.
 
 ## Uninstall
 
