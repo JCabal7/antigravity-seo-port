@@ -142,3 +142,22 @@ def rewrite_paths(
             continue
         body = _PATH_REWRITE_PATTERNS[key].sub(rf"{target_dir}/\1", body)
     return body
+
+
+def agent_target_skill_name(agent_name: str, existing_skills: set[str]) -> str:
+    """Return the target skill name; suffix `-agent` only on collision."""
+    if agent_name in existing_skills:
+        return f"{agent_name}-agent"
+    return agent_name
+
+
+def convert_agent_to_skill(agent_md: str, *, new_name: str) -> str:
+    """Convert an agents/seo-*.md file body into a SKILL.md body.
+
+    Re-emit with normalized frontmatter (claude-only keys stripped) and
+    the (possibly suffixed) new skill name.
+    """
+    fm, body = parse_frontmatter(agent_md)
+    fm["name"] = new_name
+    fm = normalize_frontmatter(fm)
+    return serialize_frontmatter(fm) + "\n" + body.lstrip("\n")

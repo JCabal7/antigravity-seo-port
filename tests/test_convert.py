@@ -143,3 +143,28 @@ def test_rewrite_paths_leaves_unrelated_text_alone():
     out = convert.rewrite_paths(body, scripts_dir="/install/scripts")
     # Only the literal "scripts/<filename>.py" pattern gets touched
     assert "/install/scripts/api" not in out
+
+
+def test_agent_to_skill_renames_on_collision():
+    out_name = convert.agent_target_skill_name("seo-technical", existing_skills={"seo-technical"})
+    assert out_name == "seo-technical-agent"
+
+
+def test_agent_to_skill_keeps_name_when_no_collision():
+    out_name = convert.agent_target_skill_name("seo-content", existing_skills={"seo-audit"})
+    assert out_name == "seo-content"
+
+
+def test_convert_agent_to_skill_normalizes_frontmatter():
+    agent_md = (
+        "---\nname: seo-technical\ndescription: Specialist.\n"
+        "model: sonnet\nmaxTurns: 20\ntools: Read, Bash\n---\n\n"
+        "You are a Technical SEO specialist.\n"
+    )
+    new_name = "seo-technical-agent"
+    out = convert.convert_agent_to_skill(agent_md, new_name=new_name)
+    fm, body = convert.parse_frontmatter(out)
+    assert fm["name"] == "seo-technical-agent"
+    assert fm["description"].startswith("Specialist")
+    assert "maxTurns" not in fm
+    assert "You are a Technical SEO specialist" in body
