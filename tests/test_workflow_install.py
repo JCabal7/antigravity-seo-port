@@ -58,3 +58,27 @@ def test_uninstall_workflows_removes_only_owned(tmp_install_root: Path):
     assert not (target / "seo.md").exists()
     assert not (target / "seo-audit.md").exists()
     assert (target / "user-other.md").exists()
+
+
+def test_discover_subcommands_from_install_root(tmp_install_root: Path):
+    skills = tmp_install_root / "skills"
+    for name, desc in [
+        ("seo", "orchestrator"),
+        ("seo-audit", "Full website audit."),
+        ("seo-page", "Single page analysis."),
+        ("seo-schema", "Schema detection."),
+        ("seo-technical-agent", "Specialist (agent-derived)."),
+    ]:
+        d = skills / name
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {desc}\n---\nbody")
+    result = workflow_install.discover_subcommands(skills)
+    # The orchestrator `seo` is not a subcommand of itself; agent skills excluded.
+    assert "audit" in result["subcmds"]
+    assert result["subcmds"]["audit"] == "seo-audit"
+    assert "page" in result["subcmds"]
+    assert "schema" in result["subcmds"]
+    assert "seo" not in result["subcmds"]
+    # Agent-derived skills (suffix -agent) are excluded from the subcommand surface.
+    assert "technical-agent" not in result["subcmds"]
+    assert result["descriptions"]["audit"] == "Full website audit."
