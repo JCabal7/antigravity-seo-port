@@ -6,10 +6,10 @@
 set -euo pipefail
 
 PORT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-INSTALL_ROOT="${HOME}/.gemini/antigravity"
-SEO_INSTALL="${INSTALL_ROOT}/skills/seo"
-MCP_CONFIG="${HOME}/.gemini/config/mcp_config.json"
-HOOKS_FILE="${INSTALL_ROOT}/hooks.json"
+INSTALL_ROOT="${HOME}/.gemini/antigravity-seo-port"
+SEO_INSTALL="${INSTALL_ROOT}"
+MCP_CONFIG="${HOME}/.gemini/antigravity-cli/mcp_config.json"
+HOOKS_FILE="${INSTALL_ROOT}/hooks/hooks.json"
 ENV_FILE="${SEO_INSTALL}/.env"
 
 NONINTERACTIVE=0
@@ -35,43 +35,29 @@ confirm() {
 snapshot() {
   local ts manifest
   ts="$(date +%Y%m%d-%H%M%S)"
-  manifest="${INSTALL_ROOT}/.antigravity-seo-uninstall-manifest-${ts}.json"
-  python3 - "${manifest}" <<'PY'
-import json, os, sys
+  manifest="${INSTALL_ROOT}.uninstall-manifest-${ts}.json"   # sibling of INSTALL_ROOT
+  python3 - "${manifest}" "${INSTALL_ROOT}" <<'PY'
+import json, sys
 from pathlib import Path
-manifest = sys.argv[1]
-install_root = Path(os.path.expanduser("~/.gemini/antigravity"))
-data = {"skills": [], "workflows": []}
+manifest, install_root = sys.argv[1], Path(sys.argv[2])
+data = {"skills": [], "exists": install_root.exists()}
 skills = install_root / "skills"
 if skills.exists():
-    data["skills"] = sorted(p.name for p in skills.iterdir() if p.is_dir() and p.name.startswith("seo"))
-wf = install_root / "workflows"
-if wf.exists():
-    data["workflows"] = sorted(p.name for p in wf.glob("seo*.md"))
+    data["skills"] = sorted(p.name for p in skills.iterdir() if p.is_dir())
 Path(manifest).parent.mkdir(parents=True, exist_ok=True)
 Path(manifest).write_text(json.dumps(data, indent=2))
 print(manifest)
 PY
 }
 
-remove_skills() {
-  log "removing seo-* skill directories ..."
-  for d in "${INSTALL_ROOT}/skills/seo"*; do
-    [ -d "${d}" ] || continue
-    rm -rf "${d}"
-  done
-  ok "skills removed"
-}
-
-remove_workflows() {
-  log "removing /seo workflows ..."
-  python3 - <<PY
-import sys; sys.path.insert(0, "${PORT_ROOT}")
-from pathlib import Path
-from lib import workflow_install
-workflow_install.uninstall_workflows(Path("${INSTALL_ROOT}/workflows"))
-PY
-  ok "workflows removed"
+remove_extension() {
+  if [ -d "${INSTALL_ROOT}" ]; then
+    log "removing extension dir ${INSTALL_ROOT} ..."
+    rm -rf "${INSTALL_ROOT}"
+    ok "extension removed"
+  else
+    log "extension dir does not exist; nothing to remove"
+  fi
 }
 
 remove_mcp() {
@@ -86,42 +72,12 @@ PY
   ok "MCP entries removed"
 }
 
-remove_env() {
+remove_env_warning() {
   if [ -f "${ENV_FILE}" ]; then
-    if confirm "Remove ${ENV_FILE} (contains API credentials)?"; then
-      python3 - <<PY
-import sys; sys.path.insert(0, "${PORT_ROOT}")
-from pathlib import Path
-from lib import env_install
-env_install.uninstall_script_extension(Path("${ENV_FILE}"))
-PY
-      ok ".env credentials removed"
-    else
-      warn ".env kept at ${ENV_FILE}"
+    if ! confirm "Extension dir contains a .env with API credentials; remove?"; then
+      echo "Aborted (extension not removed)."
+      exit 0
     fi
-  fi
-}
-
-remove_hooks() {
-  if [ -f "${HOOKS_FILE}" ]; then
-    log "removing owned hooks ..."
-    python3 - <<PY
-import json
-from pathlib import Path
-p = Path("${HOOKS_FILE}")
-data = json.loads(p.read_text())
-post = data.get("hooks", {}).get("PostToolUse", [])
-data["hooks"]["PostToolUse"] = [h for h in post if h.get("_owner") != "antigravity-seo-validate-schema"]
-p.write_text(json.dumps(data, indent=2))
-PY
-    ok "hooks removed"
-  fi
-}
-
-remove_misc() {
-  if [ -f "${INSTALL_ROOT}/AGENTS.md" ]; then
-    rm "${INSTALL_ROOT}/AGENTS.md"
-    ok "removed AGENTS.md"
   fi
 }
 
@@ -134,14 +90,11 @@ if ! confirm "Proceed with uninstall?"; then
   exit 0
 fi
 
+remove_env_warning
 manifest_path="$(snapshot)"
 ok "snapshot saved: ${manifest_path}"
 
-remove_skills
-remove_workflows
+remove_extension
 remove_mcp
-remove_env
-remove_hooks
-remove_misc
 
 printf "\nDone. Snapshot: %s\n" "${manifest_path}"
