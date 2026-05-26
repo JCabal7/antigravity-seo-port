@@ -121,7 +121,9 @@ def test_rewrite_paths_replaces_scripts_refs():
     out = convert.rewrite_paths(body, scripts_dir="/install/scripts")
     assert "/install/scripts/fetch_page.py" in out
     assert "/install/scripts/score.py" in out
-    assert "scripts/fetch_page.py" not in out
+    # Verify the original bare refs were rewritten (no ` scripts/` or `./scripts/` token left)
+    assert " scripts/fetch_page.py" not in out
+    assert "./scripts/score.py" not in out
 
 
 def test_rewrite_paths_replaces_schema_pdf_data():
