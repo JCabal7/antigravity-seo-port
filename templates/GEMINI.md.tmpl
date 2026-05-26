@@ -1,0 +1,44 @@
+# antigravity-seo-port
+
+Tier-4 SEO analysis toolkit — 25 skills and 18 specialist subagent skills, ported from [AgriciDaniel/claude-seo](https://github.com/AgriciDaniel/claude-seo).
+
+## How to use
+
+Skills are discovered automatically. Invoke any of them by name (or via Antigravity's skill picker):
+
+- `seo-audit` — full site audit
+- `seo-page` — single page analysis
+- `seo-schema` — JSON-LD schema detection + validation
+- `seo-geo` — GEO/generative engine optimization
+- …and 20 more (run `ls ~/.gemini/antigravity-seo-port/skills/` for the full list)
+
+Specialist subagent skills are suffixed `-agent` where they would have collided with a same-named skill.
+
+## Tool-name mapping (Claude Code → Antigravity)
+
+Upstream skills reference Claude Code tool names. If a skill says:
+
+| Claude Code | Antigravity equivalent |
+|---|---|
+| `Read` | `view_file` |
+| `Write` | `write_to_file` |
+| `Edit` | `replace_file_content` / `multi_replace_file_content` |
+| `Bash` | `run_command` |
+| `Grep` | `grep_search` |
+| `WebFetch` | `read_url_content` |
+| `WebSearch` | `search_web` |
+| `Task` (subagent) | `invoke_subagent` |
+
+## Extension assets
+
+- `scripts/` — Python helpers used by skills (`fetch_page.py`, etc.). Resolved at absolute paths inside skill bodies.
+- `schema/`, `pdf/`, `data/` — JSON-LD templates, guides, sample data.
+- `hooks/validate-schema.py` + `hooks/hooks.json` — `PostToolUse` hook that validates JSON-LD on Edit/Write.
+- `.venv/` — Python virtual environment for scripts.
+- `.env` — credentials for script-only extensions (Bing, Profound, SE Ranking). Owner-tagged; mode 0600.
+
+## Project context
+
+@./AGENTS.md
+
+(If an `AGENTS.md` was installed from upstream claude-seo, it provides domain-specific SEO context.)
