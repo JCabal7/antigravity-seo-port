@@ -62,3 +62,61 @@ def test_ahrefs_spec_shape():
     spec = mcp_install.MCP_SERVERS["ahrefs"]
     assert spec["server_name"] == "ahrefs"
     assert spec["env_vars"] == ["AHREFS_API_TOKEN"]
+
+
+def test_install_mcp_server_writes_new_file(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    mcp_install.install_mcp_server(
+        cfg, "firecrawl", credentials={"FIRECRAWL_API_KEY": "fc-abc"}
+    )
+    data = json.loads(cfg.read_text())
+    assert data["mcpServers"]["firecrawl-mcp"]["command"] == "npx"
+    assert data["mcpServers"]["firecrawl-mcp"]["env"]["FIRECRAWL_API_KEY"] == "fc-abc"
+
+
+def test_install_mcp_server_preserves_unrelated_entries(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    cfg.write_text(json.dumps({
+        "mcpServers": {"other-server": {"command": "node", "args": ["x.js"]}}
+    }))
+    mcp_install.install_mcp_server(
+        cfg, "firecrawl", credentials={"FIRECRAWL_API_KEY": "k"}
+    )
+    data = json.loads(cfg.read_text())
+    assert "other-server" in data["mcpServers"]
+    assert "firecrawl-mcp" in data["mcpServers"]
+
+
+def test_install_mcp_server_overwrites_same_name(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    mcp_install.install_mcp_server(cfg, "firecrawl", credentials={"FIRECRAWL_API_KEY": "old"})
+    mcp_install.install_mcp_server(cfg, "firecrawl", credentials={"FIRECRAWL_API_KEY": "new"})
+    data = json.loads(cfg.read_text())
+    assert data["mcpServers"]["firecrawl-mcp"]["env"]["FIRECRAWL_API_KEY"] == "new"
+
+
+def test_install_mcp_server_dataforseo_includes_env_defaults(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    mcp_install.install_mcp_server(
+        cfg,
+        "dataforseo",
+        credentials={"DATAFORSEO_USERNAME": "u", "DATAFORSEO_PASSWORD": "p"},
+        extra_env={"FIELD_CONFIG_PATH": "/install/extensions/dataforseo/field-config.json"},
+    )
+    env = json.loads(cfg.read_text())["mcpServers"]["dataforseo"]["env"]
+    assert env["DATAFORSEO_USERNAME"] == "u"
+    assert env["DATAFORSEO_PASSWORD"] == "p"
+    assert env["ENABLED_MODULES"].startswith("SERP")
+    assert env["FIELD_CONFIG_PATH"] == "/install/extensions/dataforseo/field-config.json"
+
+
+def test_install_mcp_server_rejects_unknown_extension(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    with pytest.raises(KeyError):
+        mcp_install.install_mcp_server(cfg, "bogus", credentials={})
+
+
+def test_install_mcp_server_rejects_missing_required_env(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    with pytest.raises(ValueError, match="missing required env var"):
+        mcp_install.install_mcp_server(cfg, "firecrawl", credentials={})

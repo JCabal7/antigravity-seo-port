@@ -70,3 +70,49 @@ MCP_SERVERS: dict[str, dict[str, Any]] = {
         "env_defaults": {},
     },
 }
+
+
+def install_mcp_server(
+    config_path: Path,
+    ext_name: str,
+    *,
+    credentials: dict[str, str],
+    extra_env: dict[str, str] | None = None,
+) -> None:
+    """Merge an MCP server entry into the Antigravity mcp_config.json.
+
+    Idempotent: same `ext_name` overwrites its own entry. Other entries
+    are preserved byte-for-byte.
+
+    Raises:
+        KeyError if `ext_name` is not in MCP_SERVERS.
+        ValueError if any required env var from the spec is missing.
+    """
+    spec = MCP_SERVERS[ext_name]  # raises KeyError on unknown
+
+    env: dict[str, str] = {}
+    env.update(spec["env_defaults"])
+    for var in spec["env_vars"]:
+        if var not in credentials or not credentials[var]:
+            raise ValueError(f"missing required env var {var} for {ext_name}")
+        env[var] = credentials[var]
+    if extra_env:
+        env.update(extra_env)
+
+    cfg = _read_config(config_path)
+    cfg.setdefault("mcpServers", {})
+    cfg["mcpServers"][spec["server_name"]] = {
+        "command": spec["command"],
+        "args": list(spec["args"]),
+        "env": env,
+    }
+    atomic_write_json(config_path, cfg)
+
+
+def _read_config(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return {}
