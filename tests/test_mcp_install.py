@@ -120,3 +120,31 @@ def test_install_mcp_server_rejects_missing_required_env(tmp_path: Path):
     cfg = tmp_path / "mcp_config.json"
     with pytest.raises(ValueError, match="missing required env var"):
         mcp_install.install_mcp_server(cfg, "firecrawl", credentials={})
+
+
+def test_remove_mcp_server_removes_only_owned(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    cfg.write_text(json.dumps({
+        "mcpServers": {
+            "firecrawl-mcp": {"command": "npx"},
+            "other-server": {"command": "node"},
+        }
+    }))
+    mcp_install.remove_mcp_server(cfg, "firecrawl")
+    data = json.loads(cfg.read_text())
+    assert "firecrawl-mcp" not in data["mcpServers"]
+    assert "other-server" in data["mcpServers"]
+
+
+def test_remove_mcp_server_no_op_when_absent(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    cfg.write_text(json.dumps({"mcpServers": {"x": {}}}))
+    mcp_install.remove_mcp_server(cfg, "firecrawl")  # should not raise
+    data = json.loads(cfg.read_text())
+    assert "x" in data["mcpServers"]
+
+
+def test_remove_mcp_server_no_file_no_op(tmp_path: Path):
+    cfg = tmp_path / "mcp_config.json"
+    mcp_install.remove_mcp_server(cfg, "firecrawl")  # should not raise
+    assert not cfg.exists()

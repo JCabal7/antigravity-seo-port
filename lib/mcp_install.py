@@ -116,3 +116,17 @@ def _read_config(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text())
     except json.JSONDecodeError:
         return {}
+
+
+def remove_mcp_server(config_path: Path, ext_name: str) -> None:
+    """Remove a previously-installed MCP server entry. No-op if absent."""
+    if not config_path.exists():
+        return
+    spec = MCP_SERVERS.get(ext_name)
+    if spec is None:
+        return
+    cfg = _read_config(config_path)
+    servers = cfg.get("mcpServers", {})
+    if spec["server_name"] in servers:
+        del servers[spec["server_name"]]
+        atomic_write_json(config_path, cfg)
