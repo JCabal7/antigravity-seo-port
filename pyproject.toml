@@ -1,0 +1,17 @@
+[project]
+name = "antigravity-seo-port"
+version = "0.1.0"
+description = "Installer that ports claude-seo to Google Antigravity"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lib*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
