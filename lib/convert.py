@@ -113,3 +113,32 @@ def _yaml_value(v: Any) -> str:
     if any(c in s for c in (":", "#", "'", '"', "\n")):
         return '"' + s.replace('"', '\\"') + '"'
     return s
+
+
+_PATH_REWRITE_PATTERNS = {
+    "scripts": re.compile(r"(?<![\w/])(?:\./)?scripts/([\w.\-]+\.(?:py|sh))"),
+    "schema": re.compile(r"(?<![\w/])(?:\./)?schema/([\w.\-/]+\.(?:json|md))"),
+    "pdf": re.compile(r"(?<![\w/])(?:\./)?pdf/([\w.\-/]+\.(?:pdf|md))"),
+    "data": re.compile(r"(?<![\w/])(?:\./)?data/([\w.\-/]+\.(?:csv|json|md|txt))"),
+}
+
+
+def rewrite_paths(
+    body: str,
+    *,
+    scripts_dir: str | None = None,
+    schema_dir: str | None = None,
+    pdf_dir: str | None = None,
+    data_dir: str | None = None,
+) -> str:
+    """Rewrite `scripts/<file>` etc. to absolute install-path refs.
+
+    Only rewrites paths that look like file references (have a recognized
+    file extension). Bare directory mentions in prose are left untouched.
+    """
+    dirs = {"scripts": scripts_dir, "schema": schema_dir, "pdf": pdf_dir, "data": data_dir}
+    for key, target_dir in dirs.items():
+        if target_dir is None:
+            continue
+        body = _PATH_REWRITE_PATTERNS[key].sub(rf"{target_dir}/\1", body)
+    return body

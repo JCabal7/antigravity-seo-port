@@ -114,3 +114,32 @@ def test_serialize_frontmatter_handles_nested_metadata():
     parsed, _ = convert.parse_frontmatter(out + "\nbody")
     assert parsed["metadata"]["author"] == "A"
     assert parsed["metadata"]["version"] == "1.0"
+
+
+def test_rewrite_paths_replaces_scripts_refs():
+    body = "Run: `python scripts/fetch_page.py <url>` then `./scripts/score.py`."
+    out = convert.rewrite_paths(body, scripts_dir="/install/scripts")
+    assert "/install/scripts/fetch_page.py" in out
+    assert "/install/scripts/score.py" in out
+    assert "scripts/fetch_page.py" not in out
+
+
+def test_rewrite_paths_replaces_schema_pdf_data():
+    body = "See `schema/templates.json` and `pdf/guide.pdf` and `data/sample.csv`."
+    out = convert.rewrite_paths(
+        body,
+        scripts_dir="/install/scripts",
+        schema_dir="/install/schema",
+        pdf_dir="/install/pdf",
+        data_dir="/install/data",
+    )
+    assert "/install/schema/templates.json" in out
+    assert "/install/pdf/guide.pdf" in out
+    assert "/install/data/sample.csv" in out
+
+
+def test_rewrite_paths_leaves_unrelated_text_alone():
+    body = "Description of scripts/api with no actual file ref."
+    out = convert.rewrite_paths(body, scripts_dir="/install/scripts")
+    # Only the literal "scripts/<filename>.py" pattern gets touched
+    assert "/install/scripts/api" not in out
